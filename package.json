@@ -1,0 +1,12 @@
+{
+  "name": "cafe-clusters",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Interactive k-means customer analytics demonstration for a fictional cafe.",
+  "scripts": {
+    "test": "node --check dist/app.js && node tests/clustering.cjs",
+    "preview": "node scripts/preview.cjs"
+  },
+  "engines": { "node": ">=22" }
+}
