@@ -63,20 +63,38 @@ function render(){
 }
 function inspect(){const s=states[index],p=data[selected];if(!p){$('#customer-detail').textContent='Select a customer to compare the distances to all centroids.';return;}let text=`<strong>Customer ${String(p.id).padStart(2,'0')}</strong> · $${p.spend} spent · ${p.visits} visits this month.`;if(s.centers.length){const ds=s.centers.map(c=>Math.sqrt(sq(p,c)));text+='<div class="distances">'+ds.map((d,j)=>`<span class="distance ${s.labels[selected]===j?'chosen':''}">${String.fromCharCode(65+j)}: ${d.toFixed(3)}${s.labels[selected]===j?' · assigned':''}</span>`).join('')+'</div><small>Euclidean distances in scaled units.'+(s.type==='move'?' These are the previous assignments. Select “Assign again” to update them.':'')+'</small>';}else text+=' The program has not assigned clusters.';$('#customer-detail').innerHTML=text;}
 function draw(){
+ $('#axis-callout').hidden=true;
  const s=states[index],svg=$('#plot'),width=$('#plot-wrap').clientWidth;const left=74,right=28,top=32,bottom=72,side=Math.max(150,Math.min(500,width-left-right)),height=side+top+bottom;
  const origin=left+(width-left-right-side)/2,X=v=>origin+v*side,Y=v=>top+(1-v)*side;
  svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.style.height=height+'px';
  let html='<title>Café customer clusters</title><desc>Horizontal axis: monthly spending in dollars. Vertical axis: visits per month. Small marks show customers. Large crosses show centroids. Select a customer to read the values.</desc>';
  html+=`<rect x="${origin}" y="${top}" width="${side}" height="${side}" fill="#fff" stroke="#d7e3ed"/>`;
  const ticks=width<400?[0,.5,1]:[0,.25,.5,.75,1];ticks.forEach(t=>{html+=`<line x1="${X(t)}" x2="${X(t)}" y1="${top+side}" y2="${top+side+5}" stroke="#a5bbce"/><text x="${X(t)}" y="${top+side+29}" text-anchor="middle">$${t*200}</text><line x1="${origin-5}" x2="${origin}" y1="${Y(t)}" y2="${Y(t)}" stroke="#a5bbce"/><text x="${origin-10}" y="${Y(t)+6}" text-anchor="end">${t*20}</text>`;});
- html+=`<text class="axis-title" x="${origin+side/2}" y="${height-8}" text-anchor="middle">Monthly spending ($)</text><text class="axis-title" transform="translate(21 ${top+side/2}) rotate(-90)" text-anchor="middle">Visits per month</text>`;
+ html+=`<text class="axis-title axis-help" role="button" tabindex="0" data-axis="x" aria-controls="axis-callout" aria-expanded="false" aria-label="Monthly spending: explain this feature" x="${origin+side/2}" y="${height-8}" text-anchor="middle">Monthly spending ($) ⓘ</text><text class="axis-title axis-help" role="button" tabindex="0" data-axis="y" aria-controls="axis-callout" aria-expanded="false" aria-label="Visits per month: explain this feature" transform="translate(21 ${top+side/2}) rotate(-90)" text-anchor="middle">Visits per month ⓘ</text>`;
  if($('#links').checked&&s.labels.length)data.forEach((p,i)=>{const c=s.centers[s.labels[i]];html+=`<line x1="${X(p.x)}" y1="${Y(p.y)}" x2="${X(c.x)}" y2="${Y(c.y)}" stroke="${colors[s.labels[i]]}" opacity="${selected===i?.9:.17}" stroke-width="${selected===i?2:1}"/>`;});
  if(s.old)s.centers.forEach((c,j)=>{const o=s.old[j];html+=`<line x1="${X(o.x)}" y1="${Y(o.y)}" x2="${X(c.x)}" y2="${Y(c.y)}" stroke="${colors[j]}" stroke-dasharray="4 3" stroke-width="2"/><circle cx="${X(o.x)}" cy="${Y(o.y)}" r="9" stroke="${colors[j]}" opacity=".35" fill="none"/>`;});
  data.forEach((p,i)=>{const x=X(p.x),y=Y(p.y),group=s.labels[i],fill=group===undefined?'#8ba4ba':colors[group];if(selected===i)html+=`<circle cx="${x}" cy="${y}" r="11" fill="none" stroke="#102f52" stroke-width="2"/>`;const common=`fill="${fill}" stroke="#fff" stroke-width="1.3"`;html+=group===1?`<rect x="${x-6}" y="${y-6}" width="12" height="12" ${common}/>`:group===2?`<path d="M${x},${y-6} l6,11 h-12Z" ${common}/>`:group===3?`<path d="M${x},${y-6} l6,6 -6,6 -6,-6Z" ${common}/>`:`<circle cx="${x}" cy="${y}" r="6.5" ${common}/>`;});
  svg.innerHTML=html;
+ document.querySelectorAll('.axis-help').forEach(label=>{
+  const open=()=>{
+   $('#axis-example').textContent=label.dataset.axis==='x'?'X-axis: one variable — total monthly spending.':'Y-axis: one variable — number of visits per month.';
+   $('#axis-callout').hidden=false;
+   document.querySelectorAll('.axis-help').forEach(el=>el.setAttribute('aria-expanded',String(el===label)));
+  };
+  label.onmouseenter=open;
+  label.onfocus=open;
+  label.onclick=e=>{e.stopPropagation();open();};
+  label.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}if(e.key==='Escape')closeAxisCallout();};
+ });
  s.centers.forEach((c,j)=>{const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','centroid');g.innerHTML=`<path d="M-10,0 H10 M0,-10 V10" stroke="#fff" stroke-width="8"/><path d="M-10,0 H10 M0,-10 V10" stroke="${colors[j]}" stroke-width="4"/><text x="15" y="-14" style="font-weight:700;paint-order:stroke;stroke:#fff;stroke-width:3px">${String.fromCharCode(65+j)}</text>`;const old=s.old?s.old[j]:c;g.style.transform=`translate(${X(old.x)}px,${Y(old.y)}px)`;svg.appendChild(g);if(s.old&&!matchMedia('(prefers-reduced-motion: reduce)').matches){requestAnimationFrame(()=>requestAnimationFrame(()=>g.style.transform=`translate(${X(c.x)}px,${Y(c.y)}px)`));}else g.style.transform=`translate(${X(c.x)}px,${Y(c.y)}px)`;});
  svg.onclick=e=>{const r=svg.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;let best=-1,d=22;data.forEach((p,i)=>{const dist=Math.hypot(X(p.x)-mx,Y(p.y)-my);if(dist<d){d=dist;best=i;}});if(best>=0){selected=best;$('#customer').value=selected;draw();inspect();}};
 }
+function closeAxisCallout(){
+ $('#axis-callout').hidden=true;
+ document.querySelectorAll('.axis-help').forEach(el=>el.setAttribute('aria-expanded','false'));
+}
+$('#axis-close').onclick=closeAxisCallout;
+$('#axis-callout').onkeydown=e=>{if(e.key==='Escape')closeAxisCallout();};
 build();render();new ResizeObserver(draw).observe($('#plot-wrap'));
 window.clusterDemo={data,get states(){return states;},get index(){return index;},setK(n){k=n;$('#k').value=n;build();render();},setSeed(n){seed=n;build();render();}};
 })();
